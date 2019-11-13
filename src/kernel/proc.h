@@ -8,6 +8,14 @@
  * 'proc', be sure to change sconst.h to match.
  */
 
+#define NR_QUEUED_GROUPS 2
+#define GROUP_A_ID 0
+#define GROUP_B_ID 1
+#define GROUP_C_ID 2
+#define DEFAULT_GROUP_ID 0
+#define NPROCS_MAX_A 5
+#define NPROCS_MAX_B 3
+
 struct proc {
   struct stackframe_s p_reg;	/* process' registers saved in stack frame */
 
@@ -58,7 +66,25 @@ struct proc {
   unsigned p_pendcount;		/* count of pending and unfinished signals */
 
   char p_name[16];		/* name of the process */
+
+  /* Lab02 */
+  unsigned char group_id;
+  unsigned short time_counter;
 };
+
+/* Lab02 */
+unsigned char n_gprocs[NR_QUEUED_GROUPS];
+unsigned short n_groups_times[NR_QUEUED_GROUPS];
+
+struct qproc_group_node {
+  struct proc* p_proc;
+  struct qproc_group_node* p_nextproc;
+};
+
+struct qproc_group_node* gprocs_head[NR_QUEUED_GROUPS];
+struct qproc_group_node* gprocs_tail[NR_QUEUED_GROUPS];
+
+#define NIL_QPG ((struct qproc_group_node*) 0)
 
 /* Guard word for task stacks. */
 #define STACK_GUARD	((reg_t) (sizeof(reg_t) == 2 ? 0xBEEF : 0xDEADBEEF))

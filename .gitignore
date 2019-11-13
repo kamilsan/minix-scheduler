@@ -1,0 +1,7 @@
+*.o
+src/mm/mm
+src/kernel/kernel
+src/fs/fs
+src/tools/image
+src/tools/init
+src/tools/revision

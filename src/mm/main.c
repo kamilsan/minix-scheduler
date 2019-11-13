@@ -178,3 +178,26 @@ PRIVATE void mm_init()
 	close(mem);
   }
 }
+
+PUBLIC int do_getprocnr(void) {
+  int i = 0;
+
+  while(i < NR_PROCS) {
+    if(mproc[i].mp_pid = pid && (mproc[i].mp_flags & IN_USE)) {
+      return i;
+    }
+    i += 1;
+  }
+
+  return ENOENT;
+}
+
+PUBLIC int do_getprocgroup(void) {
+  message msg = mm_in;
+  return _taskcall(SYSTASK, SYS_GETPROCGROUP, &msg);
+}
+
+PUBLIC int do_setprocgroup(void) {
+  message msg = mm_in;
+  return _taskcall(SYSTASK, SYS_SETPROCGROUP, &msg);
+}

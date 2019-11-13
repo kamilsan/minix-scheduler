@@ -19,6 +19,12 @@
 #include <minix/com.h>
 #include "proc.h"
 
+unsigned char n_gprocs[NR_QUEUED_GROUPS] = {0, 0};
+unsigned short n_groups_times[NR_QUEUED_GROUPS] = {1, 2};
+
+struct qproc_group_node* gprocs_head[NR_QUEUED_GROUPS] = {NIL_QPG, NIL_QPG};
+struct qproc_group_node* gprocs_tail[NR_QUEUED_GROUPS] = {NIL_QPG, NIL_QPG};
+
 PRIVATE unsigned char switching;	/* nonzero to inhibit interrupt() */
 
 FORWARD _PROTOTYPE( int mini_send, (struct proc *caller_ptr, int dest,
@@ -433,12 +439,26 @@ register struct proc *rp;	/* this process is no longer runnable */
  *===========================================================================*/
 PRIVATE void sched()
 {
+  if (rdy_head[USER_Q] == NIL_PROC) return;
+
+  /* Check if we can keep running the same process */
+  if(rdy_head[USER_Q]->group_id < GROUP_C_ID)
+  {
+    rdy_head[USER_Q]->time_counter += 1;
+
+    if(rdy_head[USER_Q]->time_counter <= n_groups_times[rdy_head[USER_Q]->group_id]) {
+      pick_proc();
+      return;
+    }
+  }
+
 /* The current process has run too long.  If another low priority (user)
  * process is runnable, put the current process on the end of the user queue,
  * possibly promoting another user to head of the queue.
  */
 
-  if (rdy_head[USER_Q] == NIL_PROC) return;
+  /* Reset time counter */
+  rdy_head[USER_Q]->time_counter = 0;
 
   /* One or more user processes queued. */
   rdy_tail[USER_Q]->p_nextready = rdy_head[USER_Q];

@@ -147,6 +147,9 @@ FORWARD _PROTOTYPE( int do_sysctl, (message *m_ptr) );
 FORWARD _PROTOTYPE( int do_puts, (message *m_ptr) );
 FORWARD _PROTOTYPE( int do_findproc, (message *m_ptr) );
 
+FORWARD _PROTOTYPE( int do_getprocgroup, (message *m_ptr) );
+FORWARD _PROTOTYPE( int do_setprocgroup, (message *m_ptr) );
+
 
 /*===========================================================================*
  *				sys_task				     *
@@ -181,12 +184,94 @@ PUBLIC void sys_task()
 	    case SYS_SYSCTL:	r = do_sysctl(&m);	break;
 	    case SYS_PUTS:	r = do_puts(&m);	break;
 	    case SYS_FINDPROC:	r = do_findproc(&m);	break;
+      case SYS_GETPROCGROUP: r = do_getprocgroup(&m); break;
+      case SYS_SETPROCGROUP: r = do_setprocgroup(&m); break;
 	    default:		r = E_BAD_FCN;
 	}
 
 	m.m_type = r;		/* 'r' reports status of call */
 	send(m.m_source, &m);	/* send reply to caller */
   }
+}
+
+PRIVATE int do_getprocgroup(m_ptr)
+register message *m_ptr;
+{
+  struct proc* proc_addr = BEG_PROC_ADDR;
+  while(proc_addr < END_PROC_ADDR) {
+    if(istaskp(proc_addr) || isservp(proc_addr)) continue;
+    if(proc_addr->p_pid == m_ptr->m1_i1) {
+      return proc_addr->group_id;
+    }
+    ++proc_addr;
+  }
+
+  return ESRCH;
+}
+
+PRIVATE int do_setprocgroup(m_ptr)
+register message *m_ptr;
+{
+  struct proc* proc_addr = BEG_PROC_ADDR;
+  struct qproc_group_node* qproc_node = NIL_QPG;
+  struct qproc_group_node* qproc_node_prev = NIL_QPG;
+  unsigned char max_proc_in_group;
+
+  if(m_ptr->m1_i2 < GROUP_A_ID || m_ptr->m1_i2 > GROUP_C_ID) return EINVAL;
+
+  while(proc_addr < END_PROC_ADDR) {
+    if(istaskp(proc_addr) || isservp(proc_addr)) continue;
+    if(proc_addr->p_pid == m_ptr->m1_i1) {
+      if(proc_addr->group_id != m_ptr->m1_i2) {
+        /* Remove process from the old group */
+        qproc_node = gprocs_head[proc_addr->group_id];
+        while(qproc_node != NIL_QPG) {
+          if(qproc_node->p_proc == proc_addr) {
+            if(qproc_node_prev == NIL_QPG) {
+              gprocs_head[proc_addr->group_id] = qproc_node->p_nextproc;
+            }
+            if(gprocs_tail[proc_addr->group_id] == qproc_node) {
+              gprocs_tail[proc_addr->group_id] = qproc_node_prev;
+            }
+            qproc_node_prev->p_nextproc = qproc_node->p_nextproc;
+            free(qproc_node);
+            n_gprocs[proc_addr->group_id] -= 1;
+            break;
+          }
+          qproc_node_prev = qproc_node;
+          qproc_node = qproc_node->p_nextproc;
+        }
+
+        if(m_ptr->m1_i2 == GROUP_A_ID) {
+          max_proc_in_group = NPROCS_MAX_A;
+        } else if(m_ptr->m1_i2 == GROUP_B_ID) {
+          max_proc_in_group = NPROCS_MAX_B;
+        }
+
+        /* Add process to new group */
+        if(m_ptr->m1_i2 < GROUP_C_ID && n_gprocs[m_ptr->m1_i2] < max_proc_in_group) {
+          qproc_node = (struct qproc_group_node*)malloc(sizeof(struct qproc_group_node));
+          qproc_node->p_proc = proc_addr;
+          qproc_node->p_nextproc = NIL_QPG;
+          if(gprocs_tail[m_ptr->m1_i2] == NIL_QPG) {
+            gprocs_head[m_ptr->m1_i2] = gprocs_tail[m_ptr->m1_i2] = qproc_node;
+          } else {
+            gprocs_tail[m_ptr->m1_i2]->p_nextproc = qproc_node;
+            gprocs_tail[m_ptr->m1_i2] = qproc_node;
+          }
+          n_gprocs[m_ptr->m1_i2] += 1;
+        }
+        else {
+          /* Add to C group */
+          proc_addr->group_id = GROUP_C_ID;
+        }
+      }
+      return OK;
+    }
+    ++proc_addr;
+  }
+
+  return ESRCH;
 }
 
 
@@ -203,6 +288,8 @@ register message *m_ptr;	/* pointer to request message */
 #endif
   register struct proc *rpc;
   struct proc *rpp;
+  struct qproc_group_node* qproc_node;
+  unsigned char max_in_group;
 
   rpp = proc_addr(m_ptr->PROC1);
   assert(isuserp(rpp));
@@ -235,6 +322,40 @@ register message *m_ptr;	/* pointer to request message */
   rpc->sys_time = 0;
   rpc->child_utime = 0;
   rpc->child_stime = 0;
+  rpc->group_id = DEFAULT_GROUP_ID;
+  rpc->time_counter = 0;
+
+  if(rpc->group_id < GROUP_C_ID) {
+    if(rpc->group_id == GROUP_A_ID) {
+      max_in_group = NPROCS_MAX_A;
+    } else if(rpc->group_id == GROUP_B_ID) {
+      max_in_group = NPROCS_MAX_B;
+    }
+    
+    /* Note: Code below will fail when queue is empty
+     *       but given that init process is in default group
+     *       this should not cause any problems */
+
+    if(n_gprocs[rpc->group_id] == max_in_group) {
+      /* Remove first added process and add new one */
+      /* by moving head to tail and changing proc pointer */
+      gprocs_head[rpc->group_id]->p_proc->group_id = GROUP_C_ID;
+
+      gprocs_tail[rpc->group_id]->p_nextproc = gprocs_head[rpc->group_id];
+      gprocs_tail[rpc->group_id] = gprocs_head[rpc->group_id];
+      gprocs_head[rpc->group_id] = gprocs_head[rpc->group_id]->p_nextproc;
+      gprocs_tail[rpc->group_id]->p_proc = rpc;
+    }
+    else {
+      /* Add new process to the queue */
+      qproc_node = (struct qproc_group_node*)malloc(sizeof(struct qproc_group_node));
+      qproc_node->p_proc = rpc;
+      qproc_node->p_nextproc = NIL_QPG;
+      gprocs_tail[rpc->group_id]->p_nextproc = qproc_node;
+      gprocs_tail[rpc->group_id] = qproc_node;
+      n_gprocs[rpc->group_id] += 1;
+    }
+  }
 
   return(OK);
 }
@@ -369,6 +490,8 @@ message *m_ptr;			/* pointer to request message */
 
   register struct proc *rp, *rc;
   struct proc *np, *xp;
+  struct qproc_group_node* qproc_node;
+  struct qproc_group_node* qproc_node_prev;
   int parent;			/* number of exiting proc's parent */
   int proc_nr;			/* number of process doing the exit */
   phys_clicks base, size;
@@ -387,6 +510,28 @@ message *m_ptr;			/* pointer to request message */
   if (rc->p_flags == 0) lock_unready(rc);
 
   strcpy(rc->p_name, "<noname>");	/* process no longer has a name */
+
+  /* remove process from group queue */
+  if(rc->group_id < GROUP_C_ID) {
+    qproc_node_prev = NIL_QPG;
+    qproc_node = gprocs_head[rc->group_id];
+    while(qproc_node != NIL_QPG) {
+      if(qproc_node->p_proc == rc) {
+        if(qproc_node_prev == NIL_QPG) {
+          gprocs_head[rc->group_id] = qproc_node->p_nextproc;
+        }
+        if(gprocs_tail[rc->group_id] == qproc_node) {
+          gprocs_tail[rc->group_id] = qproc_node_prev;
+        }
+        qproc_node_prev->p_nextproc = qproc_node->p_nextproc;
+        free(qproc_node);
+        n_gprocs[rc->group_id] -= 1;
+        break;
+      }
+      qproc_node_prev = qproc_node;
+      qproc_node = qproc_node->p_nextproc;
+    }
+  }
 
   /* If the process being terminated happens to be queued trying to send a
    * message (i.e., the process was killed by a signal, rather than it doing an
