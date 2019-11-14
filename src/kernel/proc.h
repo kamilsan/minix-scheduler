@@ -69,12 +69,12 @@ struct proc {
 
   /* Lab02 */
   unsigned char group_id;
-  unsigned short time_counter;
+  unsigned char time_counter;
 };
 
 /* Lab02 */
 unsigned char n_gprocs[NR_QUEUED_GROUPS];
-unsigned short n_groups_times[NR_QUEUED_GROUPS];
+unsigned char n_groups_times[NR_QUEUED_GROUPS];
 
 struct proc* gprocs_queue_a[NPROCS_MAX_A];
 struct proc* gprocs_queue_b[NPROCS_MAX_B];

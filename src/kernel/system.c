@@ -330,10 +330,6 @@ register message *m_ptr;	/* pointer to request message */
       max_in_group = NPROCS_MAX_B;
     }
     
-    /* Note: Code below will fail when queue is empty
-     *       but given that init process is in default group
-     *       this should not cause any problems */
-
     if(n_gprocs[rpc->group_id] == max_in_group) {
       /* Remove first added process and add new one */
       if(rpc->group_id == GROUP_A_ID) {

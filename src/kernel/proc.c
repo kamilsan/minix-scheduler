@@ -20,7 +20,7 @@
 #include "proc.h"
 
 unsigned char n_gprocs[NR_QUEUED_GROUPS] = {0, 0};
-unsigned short n_groups_times[NR_QUEUED_GROUPS] = {1, 10};
+unsigned char n_groups_times[NR_QUEUED_GROUPS] = {1, 2};
 
 struct proc* gprocs_queue_a[NPROCS_MAX_A] = {NIL_PROC};
 struct proc* gprocs_queue_b[NPROCS_MAX_B] = {NIL_PROC};
