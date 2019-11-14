@@ -76,15 +76,8 @@ struct proc {
 unsigned char n_gprocs[NR_QUEUED_GROUPS];
 unsigned short n_groups_times[NR_QUEUED_GROUPS];
 
-struct qproc_group_node {
-  struct proc* p_proc;
-  struct qproc_group_node* p_nextproc;
-};
-
-struct qproc_group_node* gprocs_head[NR_QUEUED_GROUPS];
-struct qproc_group_node* gprocs_tail[NR_QUEUED_GROUPS];
-
-#define NIL_QPG ((struct qproc_group_node*) 0)
+struct proc* gprocs_queue_a[NPROCS_MAX_A];
+struct proc* gprocs_queue_b[NPROCS_MAX_B];
 
 /* Guard word for task stacks. */
 #define STACK_GUARD	((reg_t) (sizeof(reg_t) == 2 ? 0xBEEF : 0xDEADBEEF))

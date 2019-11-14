@@ -20,10 +20,10 @@
 #include "proc.h"
 
 unsigned char n_gprocs[NR_QUEUED_GROUPS] = {0, 0};
-unsigned short n_groups_times[NR_QUEUED_GROUPS] = {1, 2};
+unsigned short n_groups_times[NR_QUEUED_GROUPS] = {1, 10};
 
-struct qproc_group_node* gprocs_head[NR_QUEUED_GROUPS] = {NIL_QPG, NIL_QPG};
-struct qproc_group_node* gprocs_tail[NR_QUEUED_GROUPS] = {NIL_QPG, NIL_QPG};
+struct proc* gprocs_queue_a[NPROCS_MAX_A] = {NIL_PROC};
+struct proc* gprocs_queue_b[NPROCS_MAX_B] = {NIL_PROC};
 
 PRIVATE unsigned char switching;	/* nonzero to inhibit interrupt() */
 

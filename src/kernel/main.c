@@ -15,8 +15,6 @@
 #include <minix/callnr.h>
 #include <minix/com.h>
 #include "proc.h"
-#include <stdlib.h>
-
 
 /*===========================================================================*
  *                                   main                                    *
@@ -131,16 +129,10 @@ PUBLIC void main()
   }
 
   proc[NR_TASKS+INIT_PROC_NR].p_pid = 1;/* INIT of course has pid 1 */
-  proc[NR_TASKS+INIT_PROC_NR].group_id = GROUP_C_ID;
+  proc[NR_TASKS+INIT_PROC_NR].group_id = DEFAULT_GROUP_ID;
   proc[NR_TASKS+INIT_PROC_NR].time_counter = 0;
 
-	/*
-	gprocs_head[DEFAULT_GROUP_ID] = gprocs_tail[DEFAULT_GROUP_ID] = 
-		(struct qproc_group_node*)malloc(sizeof(struct qproc_group_node));
-	gprocs_head[DEFAULT_GROUP_ID]->p_proc = rp;
-	gprocs_head[DEFAULT_GROUP_ID]->p_nextproc = NIL_QPG;
-	n_gprocs[DEFAULT_GROUP_ID] += 1;
-	*/
+	gprocs_queue_a[0] = &proc[NR_TASKS+INIT_PROC_NR];
 
   bill_ptr = proc_addr(IDLE);		/* it has to point somewhere */
   proc_addr(IDLE)->p_priority = PPRI_IDLE;
